@@ -20,26 +20,27 @@ func getZstdEncoderPool(params ZstdEncoderParams) *sync.Pool {
 	if c, ok := zstdAvailableEncoders.Load(params); ok {
 		return c.(*sync.Pool)
 	}
-	c, _ := zstdAvailableEncoders.LoadOrStore(params, new(sync.Pool))
-	return c.(*sync.Pool)
-}
-
-func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
-	pool := getZstdEncoderPool(params)
-
-	enc, ok := pool.Get().(*zstd.Encoder)
-	if ok {
-		return enc
-	}
 
 	encoderLevel := zstd.SpeedDefault
 	if params.Level != CompressionLevelDefault {
 		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
 	}
-	enc, _ = zstd.NewWriter(nil, zstd.WithZeroFrames(true),
-		zstd.WithEncoderLevel(encoderLevel),
-		zstd.WithEncoderConcurrency(1))
-	return enc
+
+	pool := &sync.Pool{
+		New: func() any {
+			enc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
+				zstd.WithEncoderLevel(encoderLevel),
+				zstd.WithEncoderConcurrency(1))
+			return enc
+		},
+	}
+
+	c, _ := zstdAvailableEncoders.LoadOrStore(params, pool)
+	return c.(*sync.Pool)
+}
+
+func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+	return getZstdEncoderPool(params).Get().(*zstd.Encoder)
 }
 
 func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
