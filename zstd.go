@@ -10,10 +10,10 @@ import (
 // If the pool of encoders is exhausted then new encoders will be created on the fly
 const zstdMaxBufferedEncoders = 1
 
+type ZstdDecoderParams struct {
+}
 type ZstdEncoderParams struct {
 	Level int
-}
-type ZstdDecoderParams struct {
 }
 
 var zstdDecMap sync.Map
