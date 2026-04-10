@@ -1,3 +1,4 @@
+// test: verify v1.47.0 Kafka 1.0.2 CI behavior without zstd changes
 //go:build functional
 
 package sarama
