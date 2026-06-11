@@ -79,6 +79,35 @@ type SubscriptionUserDataBalanceStrategy interface {
 	SubscriptionUserData(topics []string) ([]byte, error)
 }
 
+// OnAssignmentBalanceStrategy is an optional extension of BalanceStrategy that
+// is notified of the assignment a member receives from the leader. When a
+// strategy implements this interface, Sarama invokes OnAssignment once per
+// rebalance, immediately after the member's SyncGroup response is processed,
+// passing the member's own assignment and the generation it belongs to.
+//
+// This is the downstream counterpart to SubscriptionUserDataBalanceStrategy:
+// SubscriptionUserData lets a strategy speak into its own subscription
+// (member -> leader), while OnAssignment lets it observe what the leader
+// decided (leader -> member). Together they let a stateful assignor carry
+// information across rebalances — for example, persisting the prior
+// assignment, or echoing leader-computed state (assignment.UserData) back in
+// the member's next SubscriptionUserData so it survives membership changes.
+//
+// OnAssignment for generation N is always invoked before the member's
+// SubscriptionUserData for generation N+1, because the SyncGroup of one
+// generation completes before the JoinGroup of the next begins. OnAssignment
+// must not block; it runs on the consumer's rebalance path.
+//
+// This mirrors Java's ConsumerPartitionAssignor.onAssignment(Assignment,
+// ConsumerGroupMetadata): the assignment argument corresponds to Java's
+// Assignment (partitions + userData), and generationID corresponds to the
+// generationId carried by ConsumerGroupMetadata.
+type OnAssignmentBalanceStrategy interface {
+	BalanceStrategy
+
+	OnAssignment(assignment *ConsumerGroupMemberAssignment, generationID int32)
+}
+
 // --------------------------------------------------------------------
 
 // NewBalanceStrategyRange returns a range balance strategy,

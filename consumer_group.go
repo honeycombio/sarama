@@ -425,6 +425,10 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			c.userData = c.config.Consumer.Group.Member.UserData
 		}
 
+		// Notify a stateful strategy of the assignment it just received, so it
+		// can carry leader-computed state into its next subscription.
+		notifyAssignment(strategy, members, join.GenerationId)
+
 		for _, partitions := range claims {
 			sort.Sort(int32Slice(partitions))
 		}
@@ -517,6 +521,15 @@ func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []
 	return &ConsumerGroupMemberMetadata{
 		Topics:   topics,
 		UserData: c.userData,
+	}
+}
+
+// notifyAssignment invokes the strategy's OnAssignment callback, if it
+// implements OnAssignmentBalanceStrategy, with the assignment the member just
+// received. A no-op for strategies that do not implement the interface.
+func notifyAssignment(strategy BalanceStrategy, assignment *ConsumerGroupMemberAssignment, generationID int32) {
+	if onAssign, ok := strategy.(OnAssignmentBalanceStrategy); ok {
+		onAssign.OnAssignment(assignment, generationID)
 	}
 }
 

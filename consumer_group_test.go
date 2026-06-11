@@ -338,3 +338,40 @@ func TestSubscriptionMetadata(t *testing.T) {
 		assert.Equal(t, []byte("from-s2"), c.subscriptionMetadata(s2, topics).UserData)
 	})
 }
+
+// strategyWithOnAssignment wraps a BalanceStrategy and records the assignments
+// delivered to its OnAssignment callback, so tests can assert the leader->member
+// notification fires with the expected data.
+type strategyWithOnAssignment struct {
+	BalanceStrategy
+	gotAssignment *ConsumerGroupMemberAssignment
+	gotGeneration int32
+	calls         int
+}
+
+func (s *strategyWithOnAssignment) OnAssignment(assignment *ConsumerGroupMemberAssignment, generationID int32) {
+	s.calls++
+	s.gotAssignment = assignment
+	s.gotGeneration = generationID
+}
+
+func TestNotifyAssignment(t *testing.T) {
+	assignment := &ConsumerGroupMemberAssignment{
+		Topics:   map[string][]int32{"my-topic": {0, 1, 2}},
+		UserData: []byte("leader-state"),
+	}
+
+	t.Run("strategy implementing OnAssignment is notified", func(t *testing.T) {
+		strategy := &strategyWithOnAssignment{BalanceStrategy: NewBalanceStrategyRange()}
+		notifyAssignment(strategy, assignment, 7)
+		assert.Equal(t, 1, strategy.calls)
+		assert.Equal(t, int32(7), strategy.gotGeneration)
+		assert.Equal(t, assignment, strategy.gotAssignment)
+		assert.Equal(t, []byte("leader-state"), strategy.gotAssignment.UserData)
+	})
+
+	t.Run("strategy without OnAssignment is a no-op", func(t *testing.T) {
+		// Must not panic for a plain BalanceStrategy.
+		notifyAssignment(NewBalanceStrategyRange(), assignment, 7)
+	})
+}
